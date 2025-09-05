@@ -1,0 +1,320 @@
+---
+alwaysApply: false
+description: AWS Identity Architecture expertise - Okta, AWS SSO/IAM Identity Center, Cognito, IAM, and identity federation best practices
+---
+
+# AWS Identity Architecture Expert
+
+## Core Expertise Areas
+
+### AWS IAM Identity Center (formerly AWS SSO)
+- **Multi-Account Access**: Design patterns for centralized identity management across AWS Organizations
+- **Permission Sets**: Best practices for creating reusable permission sets with least privilege
+- **External Identity Providers**: Integration patterns with Okta, Azure AD, and other SAML 2.0/OIDC providers
+- **Session Management**: Configure session duration, MFA requirements, and conditional access policies
+- **Attribute-Based Access Control (ABAC)**: Leverage user attributes for dynamic permission boundaries
+
+### AWS Cognito
+- **User Pools vs Identity Pools**: Clear distinction and appropriate use cases
+  - User Pools: Authentication, user directory, MFA, password policies
+  - Identity Pools: Federated identities, temporary AWS credentials, fine-grained access control
+- **Authentication Flows**: 
+  - SRP (Secure Remote Password) for native apps
+  - Authorization Code Flow with PKCE for SPAs
+  - Client Credentials for M2M
+- **Custom Authentication**: Lambda triggers for advanced auth flows (pre-auth, post-auth, custom challenges)
+- **Token Management**: Access tokens, ID tokens, refresh tokens - proper usage and security
+- **Federation**: Social providers (Google, Facebook), SAML, OIDC enterprise providers
+
+### Okta Integration Patterns
+- **SAML 2.0 Configuration**: SP-initiated and IdP-initiated flows
+- **OIDC/OAuth 2.0**: Authorization code flow, implicit flow deprecation, PKCE requirements
+- **SCIM Provisioning**: Automated user lifecycle management
+- **API Access Management**: OAuth 2.0 authorization servers and custom scopes
+- **Okta Workflows**: Automation for identity governance and provisioning
+
+### IAM Best Practices
+- **Principle of Least Privilege**: Start with zero permissions, add incrementally
+- **Role-Based Access**: Prefer roles over users, use assume-role patterns
+- **Policy Types**:
+  - Identity-based policies (attached to users/groups/roles)
+  - Resource-based policies (S3 buckets, KMS keys)
+  - Permission boundaries (maximum permissions)
+  - Service Control Policies (SCPs) for Organizations
+- **Cross-Account Access**: Trust policies, external ID for third-party access
+- **Temporary Credentials**: STS assume-role, federated access patterns
+
+## Architectural Patterns
+
+### 1. Enterprise SSO with Okta + AWS IAM Identity Center
+```
+Okta (IdP) → SAML 2.0 → AWS IAM Identity Center → Permission Sets → AWS Accounts/Roles
+```
+- Configure Okta as external IdP for AWS IAM Identity Center
+- Map Okta groups to AWS permission sets
+- Enable MFA at Okta level for centralized security
+
+### 2. Customer-Facing Apps with Cognito + Okta
+```
+Web/Mobile App → Cognito User Pool → Okta (OIDC) → JWT Tokens → API Gateway/AppSync
+```
+- Use Cognito as authentication broker
+- Federate with Okta for enterprise users
+- Social login for consumer users
+
+### 3. Microservices Authentication
+```
+Service A → Cognito Client Credentials → JWT → Service B
+         ↓
+    API Gateway with Cognito Authorizer
+```
+- Machine-to-machine auth with client credentials
+- JWT validation at API Gateway
+- Scope-based authorization
+
+### 4. Zero Trust Architecture
+- **Never trust, always verify**: Authenticate every request
+- **Identity-Aware Proxy**: Use AWS Verified Access with identity providers
+- **Conditional Access**: Device trust, location-based policies
+- **Microsegmentation**: Fine-grained network and application access
+
+## Security Best Practices
+
+### Token Security
+- **Storage**: Never store tokens in localStorage (use secure, httpOnly cookies or memory)
+- **Rotation**: Implement refresh token rotation
+- **Validation**: Always validate JWTs on the server side
+- **Expiration**: Short-lived access tokens (15 min), longer refresh tokens (30 days)
+
+### MFA Strategies
+- **Risk-Based MFA**: Adaptive authentication based on context
+- **TOTP/SMS**: Time-based one-time passwords, SMS as fallback only
+- **WebAuthn/FIDO2**: Passwordless authentication for enhanced security
+- **Backup Codes**: Recovery mechanism for lost devices
+
+### Compliance Considerations
+- **GDPR**: Data residency, right to erasure, consent management
+- **SOC2**: Audit trails, access reviews, segregation of duties
+- **HIPAA**: Encryption at rest/transit, access logging, BAAs
+- **PCI DSS**: Network segmentation, strong authentication
+
+## Common Pitfalls to Avoid
+
+1. **Over-Privileged Service Accounts**: Don't use AdministratorAccess for applications
+2. **Long-Lived Credentials**: Rotate keys regularly, prefer temporary credentials
+3. **Implicit Trust**: Don't assume internal networks are secure
+4. **Weak Password Policies**: Enforce complexity, history, and rotation
+5. **Missing Audit Trails**: Enable CloudTrail, Cognito logging, and Okta system logs
+6. **CORS Misconfigurations**: Be explicit about allowed origins
+7. **JWT Secret Exposure**: Use asymmetric keys (RS256) over symmetric (HS256)
+
+## Integration Code Patterns
+
+### Cognito + API Gateway
+```typescript
+// Cognito Authorizer for API Gateway
+const authorizer = new CognitoUserPoolsAuthorizer(stack, 'Authorizer', {
+  cognitoUserPools: [userPool],
+  identitySource: 'method.request.header.Authorization'
+});
+
+// Protected API endpoint
+api.addMethod('GET', integration, {
+  authorizer,
+  authorizationType: AuthorizationType.COGNITO_USER_POOLS,
+  authorizationScopes: ['read:items']
+});
+```
+
+### Okta SAML with AWS IAM Identity Center
+```xml
+<!-- SAML Attribute Mapping -->
+<saml:Attribute Name="https://aws.amazon.com/SAML/Attributes/SessionDuration">
+  <saml:AttributeValue>PT8H</saml:AttributeValue>
+</saml:Attribute>
+<saml:Attribute Name="https://aws.amazon.com/SAML/Attributes/Role">
+  <saml:AttributeValue>arn:aws:iam::123456789012:role/OktaRole,arn:aws:iam::123456789012:saml-provider/Okta</saml:AttributeValue>
+</saml:Attribute>
+```
+
+### IAM Policy with Conditions
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["s3:GetObject"],
+    "Resource": "arn:aws:s3:::bucket/${saml:sub}/*",
+    "Condition": {
+      "StringEquals": {
+        "s3:x-amz-server-side-encryption": "AES256"
+      },
+      "IpAddress": {
+        "aws:SourceIp": ["10.0.0.0/8"]
+      }
+    }
+  }]
+}
+```
+
+## AWS MCP Server Integration
+
+### Available MCP Servers Configuration
+The workspace is configured with AWS MCP servers located in `[mcp.json](mdc:/Users/Shai.Perednik/.cursor/mcp.json)` that provide powerful AWS automation capabilities:
+
+#### 1. **Core MCP Server** (`awslabs.core-mcp-server`)
+- Provides foundational AWS expertise and prompt understanding
+- Use for general AWS architectural guidance and best practices
+- Automatically processes natural language queries into AWS solutions
+
+#### 2. **AWS API MCP Server** (`awslabs.aws-api-mcp-server`)
+- **Profile**: Uses `shai-sandbox-profile` for authentication
+- **Region**: Default `us-east-1`
+- **Working Directory**: `/Users/Shai.Perednik/.aws-mcp-server`
+- **Key Commands for Identity**:
+  ```bash
+  # List IAM Identity Center instances
+  aws sso-admin list-instances
+  
+  # List permission sets
+  aws sso-admin list-permission-sets --instance-arn <instance-arn>
+  
+  # List Cognito user pools
+  aws cognito-idp list-user-pools --max-results 20
+  
+  # Describe identity pool
+  aws cognito-identity describe-identity-pool --identity-pool-id <pool-id>
+  ```
+
+#### 3. **AWS Documentation MCP Server** (`awslabs.aws-documentation-mcp-server`)
+- Access real-time AWS documentation
+- Particularly useful for:
+  - IAM policy syntax and examples
+  - Cognito configuration parameters
+  - IAM Identity Center setup guides
+  - Security best practices documentation
+
+#### 4. **CDK MCP Server** (`awslabs.cdk-mcp-server`)
+- Generate CDK code for identity infrastructure
+- **Identity-Specific Patterns**:
+  ```typescript
+  // Cognito User Pool with Okta federation
+  const userPool = new cognito.UserPool(this, 'UserPool', {
+    userPoolName: 'okta-federated-pool',
+    selfSignUpEnabled: false,
+    signInAliases: { email: true },
+    mfa: cognito.Mfa.REQUIRED,
+    mfaSecondFactor: {
+      sms: false,
+      otp: true
+    }
+  });
+  
+  // IAM Identity Center permission set
+  const permissionSet = new identityCenter.CfnPermissionSet(this, 'PermissionSet', {
+    instanceArn: instanceArn,
+    name: 'DeveloperAccess',
+    description: 'Developer access with identity-based conditions',
+    inlinePolicy: JSON.stringify(developerPolicy)
+  });
+  ```
+
+#### 5. **AWS Diagram MCP Server** (`awslabs.aws-diagram-mcp-server`)
+- Visualize identity architectures
+- Create diagrams showing:
+  - SSO flow from Okta → AWS
+  - Cognito authentication flows
+  - IAM permission boundaries
+  - Multi-account identity federation
+
+#### 6. **AWS Support MCP Server** (`awslabs_support_mcp_server`)
+- **Profile**: Uses `shai-sandbox-profile`
+- Create support cases for identity-related issues
+- Useful for:
+  - IAM Identity Center federation problems
+  - Cognito quota increases
+  - Security finding remediation
+
+### Best Practices for MCP Server Usage
+
+#### Identity-Specific Workflows
+
+1. **Setting Up Okta Federation**:
+   ```bash
+   # Use AWS API MCP to create SAML provider
+   aws iam create-saml-provider --saml-metadata-document file://okta-metadata.xml --name Okta
+   
+   # Use CDK MCP to generate IAM Identity Center setup
+   # Then use Documentation MCP for configuration guides
+   ```
+
+2. **Cognito User Pool Creation**:
+   ```bash
+   # Use AWS API MCP to create user pool
+   aws cognito-idp create-user-pool --pool-name MyPool --policies file://password-policy.json
+   
+   # Use CDK MCP for infrastructure as code
+   # Use Diagram MCP to visualize authentication flow
+   ```
+
+3. **Permission Troubleshooting**:
+   ```bash
+   # Use AWS API MCP to simulate policies
+   aws iam simulate-principal-policy --policy-source-arn <role-arn> --action-names s3:GetObject
+   
+   # Use Documentation MCP for policy syntax
+   # Use Support MCP if encountering service limits
+   ```
+
+#### Security Considerations with MCP Servers
+
+- **Profile Management**: Always use the configured `shai-sandbox-profile` [[memory:4975480]]
+- **Regional Operations**: Default to `us-east-1` unless specified
+- **Audit Trail**: MCP server commands are logged via CloudTrail
+- **Temporary Credentials**: MCP servers use STS tokens, not long-lived keys
+
+#### Common MCP Server Commands for Identity Tasks
+
+```bash
+# List all federated users (via AWS API MCP)
+aws sso-admin list-account-assignments --instance-arn <arn> --account-id <id>
+
+# Get Cognito user pool details
+aws cognito-idp describe-user-pool --user-pool-id <pool-id>
+
+# Check IAM policy evaluation
+aws iam simulate-custom-policy --policy-input-list file://policy.json --action-names <actions>
+
+# List identity providers
+aws iam list-saml-providers
+aws cognito-idp list-identity-providers --user-pool-id <pool-id>
+```
+
+#### Integration Tips
+
+1. **Combine MCP Servers**: Use Documentation MCP to understand parameters, then AWS API MCP to execute
+2. **CDK Generation**: Use CDK MCP for initial setup, then AWS API MCP for runtime operations
+3. **Troubleshooting Flow**: AWS API MCP → Documentation MCP → Support MCP (if needed)
+4. **Visualization**: Use Diagram MCP to document your identity architecture after implementation
+
+## Monitoring and Observability
+
+- **CloudTrail**: API calls, authentication events
+- **AWS CloudWatch**: Cognito metrics, failed authentications
+- **AWS Security Hub**: Compliance findings, security posture
+- **Okta System Log**: Real-time authentication events
+- **X-Ray**: Distributed tracing for authentication flows
+
+## Cost Optimization
+
+- **Cognito Pricing**: MAU-based, optimize user pool settings
+- **IAM Identity Center**: Free for AWS SSO, costs for external IdP sessions
+- **API Gateway**: Cache authorization results to reduce Lambda invocations
+- **KMS**: Use AWS-managed keys where possible, customer-managed for sensitive data
+
+## Future-Proofing
+
+- **Passwordless**: Prepare for WebAuthn adoption
+- **Decentralized Identity**: Consider W3C DID standards
+- **Privacy-Preserving**: Zero-knowledge proofs, selective disclosure
+- **Quantum-Safe**: Monitor NIST PQC standards for cryptographic transitions

@@ -1,0 +1,29 @@
+{
+  "name": "cdk-s3-explorer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "deploy": "cdk deploy --profile shai-sandbox-profile",
+    "destroy": "cdk destroy --profile shai-sandbox-profile",
+    "synth": "cdk synth --profile shai-sandbox-profile"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-cdk/assertions": "^1.203.0",
+    "@aws-cdk/integ-tests-alpha": "^2.214.0-alpha.0",
+    "@types/node": "^24.3.1",
+    "aws-cdk-lib": "^2.214.0",
+    "constructs": "^10.4.2",
+    "typescript": "^5.9.2"
+  }
+}

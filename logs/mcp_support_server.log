@@ -1,0 +1,5 @@
+2025-09-05 17:13:29.945 | INFO     | awslabs.aws_support_mcp_server.server:main:704 | 8400691392:68015 | {'diagnostics': True} - AWS Support MCP Server starting up. Log file: /Users/Shai.Perednik/Documents/code_workspace/near-aws-sso-okta-foldershare/logs/mcp_support_server.log
+2025-09-05 17:13:29.945 | INFO     | awslabs.aws_support_mcp_server.server:main:706 | 8400691392:68015 | {'diagnostics': True} - Debug mode: True
+2025-09-05 17:13:29.945 | DEBUG    | awslabs.aws_support_mcp_server.server:main:710 | 8400691392:68015 | {'diagnostics': True} - Enabling detailed performance tracking and error monitoring
+2025-09-05 17:13:29.945 | DEBUG    | awslabs.aws_support_mcp_server.server:main:715 | 8400691392:68015 | {'diagnostics': True} - Starting awslabs_support_mcp_server MCP server
+2025-09-05 17:13:29.945 | INFO     | awslabs.aws_support_mcp_server.server:main:718 | 8400691392:68015 | {'diagnostics': True} - Starting AWS Support MCP Server with stdio transport
