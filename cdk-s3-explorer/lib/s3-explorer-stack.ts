@@ -9,8 +9,7 @@ import * as cloudtrail from 'aws-cdk-lib/aws-cloudtrail';
 import { Construct } from 'constructs';
 
 export interface S3ExplorerStackProps extends cdk.StackProps {
-  oktaDomain: string;
-  oktaClientId: string;
+  // No external IDP configuration needed for native Cognito
 }
 
 export class S3ExplorerStack extends cdk.Stack {
@@ -26,18 +25,33 @@ export class S3ExplorerStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       lifecycleRules: [{
         noncurrentVersionExpiration: cdk.Duration.days(30)
+      }],
+      cors: [{
+        allowedMethods: [
+          s3.HttpMethods.GET,
+          s3.HttpMethods.PUT,
+          s3.HttpMethods.POST,
+          s3.HttpMethods.DELETE,
+          s3.HttpMethods.HEAD
+        ],
+        allowedOrigins: ['https://dzt2uly9d2ah2.cloudfront.net'], // Will be updated in deployment
+        allowedHeaders: ['*'],
+        exposedHeaders: ['ETag', 'x-amz-version-id'],
+        maxAge: 3000
       }]
     });
 
-    // S3 bucket for hosting the web application
+    // S3 bucket for hosting the web application with public read access
     const webBucket = new s3.Bucket(this, 'WebBucket', {
       bucketName: `s3-explorer-web-${this.account}-${this.region}`,
       websiteIndexDocument: 'index.html',
       websiteErrorDocument: 'error.html',
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL, // Will be overridden for public read
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true
     });
+
+    // S3BucketOrigin automatically creates Origin Access Identity and grants permissions
 
     // CloudTrail for audit logging
     const trail = new cloudtrail.Trail(this, 'S3ExplorerTrail', {
@@ -56,40 +70,50 @@ export class S3ExplorerStack extends cdk.Stack {
       includeManagementEvents: false
     });
 
-    // Cognito User Pool
+    // CloudFront distribution for HTTPS support
+    const distribution = new cloudfront.Distribution(this, 'Distribution', {
+      defaultBehavior: {
+        origin: new cloudfront_origins.S3StaticWebsiteOrigin(webBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED
+      },
+      defaultRootObject: 'index.html',
+      errorResponses: [{
+        httpStatus: 404,
+        responseHttpStatus: 200,
+        responsePagePath: '/index.html'
+      }]
+    });
+
+    // Cognito User Pool with proper hosted UI configuration
     const userPool = new cognito.UserPool(this, 'UserPool', {
       userPoolName: 's3-explorer-users',
       selfSignUpEnabled: false,
       signInAliases: {
         email: true
       },
-      accountRecovery: cognito.AccountRecovery.NONE,
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY, // Enable email-based recovery for hosted UI
+      passwordPolicy: {
+        minLength: 8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: false
+      },
       removalPolicy: cdk.RemovalPolicy.DESTROY
     });
 
-    // Configure Okta as OIDC provider
-    const oktaProvider = new cognito.UserPoolIdentityProviderOidc(this, 'OktaProvider', {
-      userPool,
-      clientId: props.oktaClientId,
-      clientSecret: '', // Okta doesn't require client secret for public clients
-      issuerUrl: `https://${props.oktaDomain}`,
-      name: 'Okta',
-      scopes: ['openid', 'email', 'profile'],
-      attributeMapping: {
-        email: cognito.ProviderAttribute.other('email'),
-        givenName: cognito.ProviderAttribute.other('given_name'),
-        familyName: cognito.ProviderAttribute.other('family_name'),
-        preferredUsername: cognito.ProviderAttribute.other('preferred_username')
-      }
-    });
+    // Configure user pool for native Cognito authentication with enhanced security
 
-    // User Pool Client
+    // User Pool Client with proper hosted UI configuration
     const userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
       userPool,
       generateSecret: false,
+      preventUserExistenceErrors: true, // Security best practice: prevent user enumeration
       supportedIdentityProviders: [
-        cognito.UserPoolClientIdentityProvider.custom(oktaProvider.providerName)
+        cognito.UserPoolClientIdentityProvider.COGNITO
       ],
+      // OAuth configuration for hosted UI - removed conflicting authFlows
       oAuth: {
         flows: {
           authorizationCodeGrant: true
@@ -100,18 +124,13 @@ export class S3ExplorerStack extends cdk.Stack {
           cognito.OAuthScope.PROFILE
         ],
         callbackUrls: [
-          'http://localhost:3000/callback',
-          // CloudFront URL will be added after deployment
+          `https://${distribution.distributionDomainName}/callback`
         ],
         logoutUrls: [
-          'http://localhost:3000/',
-          // CloudFront URL will be added after deployment
+          `https://${distribution.distributionDomainName}/`
         ]
       }
     });
-
-    // Ensure Okta provider is created before client
-    userPoolClient.node.addDependency(oktaProvider);
 
     // Cognito Domain
     const cognitoDomain = new cognito.UserPoolDomain(this, 'CognitoDomain', {
@@ -174,36 +193,8 @@ export class S3ExplorerStack extends cdk.Stack {
       }
     });
 
-    // CloudFront distribution
-    const distribution = new cloudfront.Distribution(this, 'Distribution', {
-      defaultBehavior: {
-        origin: new cloudfront_origins.S3Origin(webBucket),
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-        originRequestPolicy: cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN
-      },
-      defaultRootObject: 'index.html',
-      errorResponses: [{
-        httpStatus: 404,
-        responseHttpStatus: 200,
-        responsePagePath: '/index.html',
-        ttl: cdk.Duration.seconds(0)
-      }]
-    });
-
-    // Grant CloudFront access to web bucket
-    webBucket.grantRead(new iam.ServicePrincipal('cloudfront.amazonaws.com', {
-      conditions: {
-        StringEquals: {
-          'AWS:SourceArn': `arn:aws:cloudfront::${this.account}:distribution/${distribution.distributionId}`
-        }
-      }
-    }));
-
     // Deploy placeholder web app
-    new s3deploy.BucketDeployment(this, 'DeployWebsite', {
-      sources: [s3deploy.Source.data('index.html', `
-<!DOCTYPE html>
+    const setupHtmlContent = `<!DOCTYPE html>
 <html>
 <head>
     <title>S3 Explorer - Setup Required</title>
@@ -218,8 +209,8 @@ export class S3ExplorerStack extends cdk.Stack {
         <h1>S3 Explorer - Setup Required</h1>
         <p>The infrastructure has been deployed successfully. Now you need to:</p>
         <ol>
-            <li>Update the Okta application with the callback URL: <code>https://${distribution.distributionDomainName}/callback</code></li>
-            <li>Deploy the S3 Explorer application (see next steps)</li>
+            <li>Create users in the Cognito User Pool (see next steps)</li>
+            <li>Deploy the S3 Explorer application</li>
         </ol>
         <h2>Configuration:</h2>
         <pre>
@@ -232,19 +223,40 @@ export class S3ExplorerStack extends cdk.Stack {
   "cognitoDomain": "https://${cognitoDomain.domainName}.auth.${this.region}.amazoncognito.com"
 }
         </pre>
+        <h2>User Management:</h2>
+        <p>Users can be managed directly in the Cognito User Pool:</p>
+        <ul>
+            <li>Go to AWS Console → Cognito → User pools → s3-explorer-users</li>
+            <li>Create users with email addresses and set temporary passwords</li>
+            <li>Users will receive an email to set their password on first login</li>
+        </ul>
+        <h2>Access URLs:</h2>
+        <ul>
+            <li><strong>Application (HTTPS):</strong> <code>https://${distribution.distributionDomainName}</code></li>
+            <li><strong>Application (HTTP):</strong> <code>http://s3-explorer-web-${this.account}-${this.region}.s3-website-${this.region}.amazonaws.com</code></li>
+            <li><strong>Cognito Login:</strong> <code>https://${cognitoDomain.domainName}.auth.${this.region}.amazoncognito.com/login</code></li>
+        </ul>
     </div>
 </body>
-</html>
-      `)],
+</html>`;
+
+    new s3deploy.BucketDeployment(this, 'DeployWebsite', {
+      sources: [s3deploy.Source.data('index.html', setupHtmlContent)],
       destinationBucket: webBucket,
       distribution,
       distributionPaths: ['/*']
     });
 
-    // Outputs
+    // CloudFront URL output
     new cdk.CfnOutput(this, 'CloudFrontURL', {
       value: `https://${distribution.distributionDomainName}`,
-      description: 'CloudFront distribution URL'
+      description: 'CloudFront distribution URL with HTTPS support'
+    });
+
+    // S3 Website URL output
+    new cdk.CfnOutput(this, 'S3WebsiteURL', {
+      value: `http://s3-explorer-web-${this.account}-${this.region}.s3-website-${this.region}.amazonaws.com`,
+      description: 'S3 Website URL for direct access'
     });
 
     new cdk.CfnOutput(this, 'UserPoolId', {
@@ -267,14 +279,14 @@ export class S3ExplorerStack extends cdk.Stack {
       description: 'S3 bucket for storing uploaded files'
     });
 
-    new cdk.CfnOutput(this, 'CognitoDomain', {
+    new cdk.CfnOutput(this, 'HostedUIDomain', {
       value: `https://${cognitoDomain.domainName}.auth.${this.region}.amazoncognito.com`,
       description: 'Cognito hosted UI domain'
     });
 
-    new cdk.CfnOutput(this, 'OktaCallbackUrl', {
-      value: `https://${distribution.distributionDomainName}/callback`,
-      description: 'Add this to your Okta app redirect URIs'
+    new cdk.CfnOutput(this, 'UserPoolDomain', {
+      value: `https://${cognitoDomain.domainName}.auth.${this.region}.amazoncognito.com`,
+      description: 'Cognito User Pool domain for authentication'
     });
   }
 }

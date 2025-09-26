@@ -115,7 +115,7 @@ const auth = {
             client_id: config.userPoolClientId,
             redirect_uri: window.location.origin + '/callback',
             scope: 'openid email profile',
-            identity_provider: 'Okta'
+            // No identity provider specified - using native Cognito
         });
         
         window.location.href = `${authEndpoint}?${params}`;
