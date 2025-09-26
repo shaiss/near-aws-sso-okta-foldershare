@@ -25,9 +25,9 @@ Secure, scalable architecture with AWS best practices implemented.
 ## 🚀 Quick Start
 
 ### Access the Application
-- **Application URL**: `https://dzt2uly9d2ah2.cloudfront.net`
+- **Application URL**: `https://CLOUDFRONT_DOMAIN_REDACTED.cloudfront.net`
 - **Login**: Click "Sign in with Cognito"
-- **Username**: `shai.perednik@near.foundation`
+- **Username**: `USER_EMAIL_REDACTED`
 
 ### Key Features
 
@@ -83,17 +83,17 @@ cdk deploy S3ExplorerStack --profile sso-profile
 ## 🌐 Live Application URLs
 
 ### **Production URLs**:
-- **📱 Application**: `https://dzt2uly9d2ah2.cloudfront.net`
-- **🔐 Cognito Login**: `https://s3-explorer-311843862895.auth.us-east-1.amazoncognito.com/login`
-- **🪣 Data Bucket**: `s3-explorer-data-311843862895-us-east-1`
-- **📦 Web Bucket**: `s3-explorer-web-311843862895-us-east-1`
+- **📱 Application**: `https://CLOUDFRONT_DOMAIN_REDACTED.cloudfront.net`
+- **🔐 Cognito Login**: `https://s3-explorer-ACCOUNT_ID_REDACTED.auth.us-east-1.amazoncognito.com/login`
+- **🪣 Data Bucket**: `s3-explorer-data-ACCOUNT_ID_REDACTED-us-east-1`
+- **📦 Web Bucket**: `s3-explorer-web-ACCOUNT_ID_REDACTED-us-east-1`
 
 ### **Test Credentials**:
-- **Username**: `shai.perednik@near.foundation`
+- **Username**: `USER_EMAIL_REDACTED`
 - **Status**: Active user with confirmed status
 
 ### **How to Use**:
-1. Navigate to `https://dzt2uly9d2ah2.cloudfront.net`
+1. Navigate to `https://CLOUDFRONT_DOMAIN_REDACTED.cloudfront.net`
 2. Click "Sign in with Cognito"
 3. Login with email credentials
 4. Upload, download, and manage files in S3
@@ -120,16 +120,16 @@ The application is automatically configured during deployment with these values:
 ```json
 {
   "region": "us-east-1",
-  "userPoolId": "us-east-1_GtEOOuFda",
-  "userPoolClientId": "36lcrih04m1l91bjbjrfa91eap",
-  "identityPoolId": "us-east-1:aaada1f8-eb95-4fd3-a31f-15c180eda50c",
-  "dataBucketName": "s3-explorer-data-311843862895-us-east-1",
-  "cognitoDomain": "https://s3-explorer-311843862895.auth.us-east-1.amazoncognito.com"
+  "userPoolId": "USER_POOL_ID_REDACTED",
+  "userPoolClientId": "USER_POOL_CLIENT_ID_REDACTED",
+  "identityPoolId": "IDENTITY_POOL_ID_REDACTED",
+  "dataBucketName": "s3-explorer-data-ACCOUNT_ID_REDACTED-us-east-1",
+  "cognitoDomain": "https://s3-explorer-ACCOUNT_ID_REDACTED.auth.us-east-1.amazoncognito.com"
 }
 ```
 
 ### 🔧 Infrastructure Details
-- **AWS Account**: `311843862895`
+- **AWS Account**: `ACCOUNT_ID_REDACTED`
 - **Region**: `us-east-1`
 - **Stack Name**: `S3ExplorerStack`
 - **Environment**: Production-ready with all security features
@@ -237,8 +237,8 @@ This project successfully migrated from Okta to AWS Cognito and is now **fully o
 ### 🚀 **Ready for Production Use**
 
 The application is production-ready and can be used by the entire team:
-- **Access**: `https://dzt2uly9d2ah2.cloudfront.net`
-- **Authentication**: `shai.perednik@near.foundation`
+- **Access**: `https://CLOUDFRONT_DOMAIN_REDACTED.cloudfront.net`
+- **Authentication**: `USER_EMAIL_REDACTED`
 - **Features**: Full file management capabilities
 - **Security**: Enterprise-grade protection and monitoring
 
